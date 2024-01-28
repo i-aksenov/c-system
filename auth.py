@@ -1,12 +1,15 @@
+import os
 import string
 
+import requests
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import login_required, login_user, logout_user
 
-from limit import limiter
 from models import User
 
 auth = Blueprint("auth", __name__)
+
+RC_SITE_KEY = os.getenv("RC_SITE_KEY")
 
 
 @auth.route("/login", methods=["GET", "POST"])
@@ -46,21 +49,31 @@ def logout():
 
 
 @auth.route("/recover", methods=["GET", "POST"])
-@limiter.limit("3 per 5 minutes")
 def recover_password():
     if request.method == "POST":
+        # check recaptcha
+        rc_resp = request.form.get("g-recaptcha-response")
+        secret_key = os.getenv("RC_SECRET_KEY")
+        payload = {"secret": secret_key, "response": rc_resp}
+        r = requests.post(
+            "https://www.google.com/recaptcha/api/siteverify", data=payload
+        )
+        result = r.json()
+        if not result["success"]:
+            return render_template("recover.html", rc_site_key=RC_SITE_KEY)
+        
         username = request.form.get("username")
         secret_answer = request.form.get("secret_answer").lower()
 
         user = User.query.filter_by(username=username).first()
 
         if not user:
-            return render_template("recover.html")
+            return render_template("recover.html", rc_site_key=RC_SITE_KEY)
 
         if not user.question_answer:
-            return render_template("recover.html")
+            return render_template("recover.html", rc_site_key=RC_SITE_KEY)
 
         if user.question_answer.lower() == secret_answer:
             flash(f"Пароль восстановлен: {user.password}")
 
-    return render_template("recover.html")
+    return render_template("recover.html", rc_site_key=RC_SITE_KEY)

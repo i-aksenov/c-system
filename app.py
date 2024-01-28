@@ -3,7 +3,6 @@ import os
 from flask import Flask
 from flask_login import LoginManager
 
-from limit import limiter
 from models import Client, Document, User, db
 
 
@@ -13,7 +12,6 @@ def create_app():
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 
     db.init_app(app)
-    limiter.init_app(app)
 
     login_manager = LoginManager()
     login_manager.login_view = "auth.login"
